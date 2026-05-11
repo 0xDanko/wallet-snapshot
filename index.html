@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wallet Balance Snapshot</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: #2a2a3a;
+    --accent: #7fff6e;
+    --accent2: #5bc8f5;
+    --accent3: #f5a623;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --danger: #ff5f5f;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 40px 24px;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: -200px; left: -200px;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(127,255,110,0.04) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .container { max-width: 960px; margin: 0 auto; }
+
+  header { margin-bottom: 40px; }
+  header h1 {
+    font-family: 'Space Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+    margin-bottom: 6px;
+  }
+  header p { color: var(--muted); font-size: 14px; font-weight: 300; }
+
+  label {
+    display: block;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    padding: 12px 14px;
+    border-radius: 6px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input:focus { border-color: var(--accent); }
+
+  .top-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .cg-row {
+    display: grid;
+    grid-template-columns: 2fr 2fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .wallets-section { margin-bottom: 24px; }
+  .wallet-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    margin-bottom: 14px;
+    align-items: end;
+  }
+
+  .chain-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .chain-tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .chain-tag.active-eth  { border-color: var(--accent);  color: var(--accent);  background: rgba(127,255,110,0.08); }
+  .chain-tag.active-gno  { border-color: var(--accent2); color: var(--accent2); background: rgba(91,200,245,0.08); }
+  .chain-tag.active-base { border-color: var(--accent3); color: var(--accent3); background: rgba(245,166,35,0.08); }
+
+  .btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 13px 28px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+  .btn-primary { background: var(--accent); color: #0a0a0f; width: 100%; margin-bottom: 12px; }
+  .btn-primary:hover { background: #a0ffaa; transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-add {
+    background: transparent; color: var(--muted);
+    border: 1px dashed var(--border);
+    padding: 10px 18px; font-size: 11px; width: 100%; margin-bottom: 24px;
+  }
+  .btn-add:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-remove {
+    background: transparent; border: 1px solid var(--border); color: var(--muted);
+    padding: 10px 14px; font-size: 13px; border-radius: 6px; cursor: pointer;
+    transition: all 0.15s; height: 42px; align-self: end;
+  }
+  .btn-remove:hover { border-color: var(--danger); color: var(--danger); }
+
+  #status {
+    font-family: 'Space Mono', monospace; font-size: 12px;
+    color: var(--muted); margin-bottom: 24px; min-height: 18px;
+  }
+  #status.error { color: var(--danger); }
+
+  .results-section { display: none; }
+  .results-section.visible { display: block; }
+
+  .wallet-block { margin-bottom: 32px; }
+  .wallet-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 16px; padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .wallet-label { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .wallet-addr  { font-family: 'Space Mono', monospace; font-size: 13px; color: var(--text); }
+
+  .chain-block { margin-bottom: 24px; }
+  .chain-label {
+    display: inline-flex; align-items: center;
+    font-family: 'Space Mono', monospace; font-size: 10px;
+    letter-spacing: 1px; text-transform: uppercase;
+    margin-bottom: 10px; padding: 4px 10px; border-radius: 4px;
+  }
+  .chain-eth  { color: var(--accent);  background: rgba(127,255,110,0.08); }
+  .chain-gno  { color: var(--accent2); background: rgba(91,200,245,0.08); }
+  .chain-base { color: var(--accent3); background: rgba(245,166,35,0.08); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    font-family: 'Space Mono', monospace; font-size: 10px;
+    letter-spacing: 1px; text-transform: uppercase; color: var(--muted);
+    padding: 8px 12px; border-bottom: 1px solid var(--border);
+  }
+  th.right { text-align: right; }
+  td { padding: 10px 12px; border-bottom: 1px solid rgba(42,42,58,0.5); font-weight: 300; }
+  td.mono { font-family: 'Space Mono', monospace; font-size: 12px; }
+  td.right { text-align: right; font-family: 'Space Mono', monospace; font-size: 12px; }
+  td.usd-val { text-align: right; font-family: 'Space Mono', monospace; font-size: 12px; color: var(--accent); }
+  td.no-price { text-align: right; font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+
+  .chain-total {
+    font-family: 'Space Mono', monospace; font-size: 11px;
+    color: var(--muted); text-align: right;
+    padding: 8px 12px 0;
+  }
+  .chain-total span { color: var(--accent); font-size: 13px; }
+
+  .snapshot-info { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); margin-bottom: 10px; }
+  .separator { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+
+  .export-btn {
+    background: transparent; border: 1px solid var(--border); color: var(--muted);
+    font-family: 'Space Mono', monospace; font-size: 11px;
+    padding: 8px 16px; border-radius: 5px; cursor: pointer; margin-bottom: 32px; transition: all 0.15s;
+  }
+  .export-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
+
+  .cors-banner {
+    display: none;
+    background: rgba(255,95,95,0.08);
+    border: 1px solid var(--danger);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    font-size: 13px;
+    line-height: 1.7;
+  }
+  .cors-banner strong { color: var(--danger); font-family: "Space Mono", monospace; font-size: 12px; }
+  .cors-banner code {
+    display: block;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 14px;
+    font-family: "Space Mono", monospace;
+    font-size: 12px;
+    color: var(--accent);
+    margin: 10px 0 4px;
+    user-select: all;
+  }
+  .hint-text { font-size: 9px; color: var(--accent); text-transform: none; letter-spacing: 0; margin-left: 4px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>// wallet snapshot</h1>
+    <p>Historical token balances &amp; USD values at a specific block &middot; Ethereum &middot; Gnosis &middot; Base</p>
+  </header>
+
+
+  <!-- CORS warning: shown when running from file:// -->
+  <div class="cors-banner" id="corsBanner">
+    <strong>&#9888; Cannot run from file://</strong><br>
+    Your browser blocks API calls from local files. You need to serve this file over HTTP.<br>
+    Open a terminal in the folder containing this file and run:
+    <code>python3 -m http.server 8080</code>
+    Then open <strong style="color:var(--accent2)">http://localhost:8080/wallet-balance-checker.html</strong> in your browser.
+  </div>
+  <div class="top-grid">
+    <div>
+      <label>Etherscan API Key <span class="hint-text">one key for all chains &mdash; etherscan.io/myapikey</span></label>
+      <input type="text" id="apiKey" value="VH6MV7REZAG87659SN96TD7JHFDQA5X6VS" />
+    </div>
+    <div>
+      <label>Snapshot Date</label>
+      <input type="date" id="snapDate" value="2025-04-30" />
+    </div>
+    <div>
+      <label>Time (UTC)</label>
+      <input type="time" id="snapTime" value="23:59" />
+    </div>
+  </div>
+
+  <div class="cg-row">
+    <div>
+      <label>CoinGecko Demo API Key <span class="hint-text">free at coingecko.com/en/api/pricing &mdash; for historical prices</span></label>
+      <input type="text" id="cgKey" value="CG-X9mxsgB8J7GdDaky9UbpESrc" />
+    </div>
+    <div style="display:flex;align-items:flex-end;">
+      <p style="font-size:12px;color:var(--muted);padding-bottom:14px;line-height:1.5">
+        Tokens with USD value &lt; $1.00 will be hidden. Prices fetched from CoinGecko historical data at snapshot time.
+      </p>
+    </div>
+  </div>
+
+  <div class="wallets-section" id="walletsList"></div>
+  <button class="btn btn-add" onclick="addWallet()">+ Add Wallet</button>
+
+  <button class="btn btn-primary" id="fetchBtn" onclick="fetchAll()">Fetch Balances</button>
+  <div id="status"></div>
+
+  <div class="results-section" id="results">
+    <button class="export-btn" onclick="exportCSV()">&#8595; Export CSV</button>
+    <div id="resultsInner"></div>
+  </div>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────────
+
+const V2 = 'https://api.etherscan.io/v2/api';
+const CG = 'https://api.coingecko.com/api/v3';
+
+const CHAINS = {
+  eth:  { label: 'Ethereum', chainId: 1,    nativeSym: 'ETH',  nativeDec: 18, cgPlatform: 'ethereum', cgNativeId: 'ethereum' },
+  gno:  { label: 'Gnosis',   chainId: 100,  nativeSym: 'xDAI', nativeDec: 18, cgPlatform: 'xdai',     cgNativeId: 'xdai' },
+  base: { label: 'Base',     chainId: 8453, nativeSym: 'ETH',  nativeDec: 18, cgPlatform: 'base',     cgNativeId: 'ethereum' },
+};
+
+const defaultWallets = [
+  { address: '0x8da064b0445f1d461b0a4fd598bcafad40569655', chains: ['eth'] },
+  { address: '0xb7364fca20eec90f51b158c05199044ad362b675', chains: ['eth', 'gno', 'base'] },
+];
+
+let wallets = [];
+let allResults = [];
+
+// ── Wallet UI ─────────────────────────────────────────────────────────────────
+
+function addWallet(addr = '', chains = ['eth']) {
+  wallets.push({ id: Date.now(), address: addr, chains: [...chains] });
+  renderWallets();
+}
+
+function removeWallet(id) {
+  wallets = wallets.filter(w => w.id !== id);
+  renderWallets();
+}
+
+function toggleChain(id, chain) {
+  const w = wallets.find(w => w.id === id);
+  if (!w) return;
+  const idx = w.chains.indexOf(chain);
+  if (idx === -1) w.chains.push(chain);
+  else if (w.chains.length > 1) w.chains.splice(idx, 1);
+  renderWallets();
+}
+
+function renderWallets() {
+  document.getElementById('walletsList').innerHTML = wallets.map((w, i) => `
+    <div class="wallet-row">
+      <div>
+        <label>Wallet ${i + 1}</label>
+        <input type="text" value="${w.address}"
+          oninput="wallets.find(x=>x.id===${w.id}).address=this.value.trim()"
+          placeholder="0x..." />
+        <div class="chain-tags">
+          ${Object.keys(CHAINS).map(c => `
+            <span class="chain-tag ${w.chains.includes(c) ? 'active-' + c : ''}"
+              onclick="toggleChain(${w.id},'${c}')">${CHAINS[c].label}</span>
+          `).join('')}
+        </div>
+      </div>
+      ${wallets.length > 1 ? `<button class="btn-remove" onclick="removeWallet(${w.id})">&#x2715;</button>` : ''}
+    </div>
+  `).join('');
+}
+
+defaultWallets.forEach(w => addWallet(w.address, w.chains));
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function setStatus(msg, isError = false) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = isError ? 'error' : '';
+}
+
+function esKey()  { return document.getElementById('apiKey').value.trim(); }
+function cgKey()  { return document.getElementById('cgKey').value.trim(); }
+
+// Etherscan V2
+async function esFetch(chainKey, params) {
+  const chain = CHAINS[chainKey];
+  const qs = Object.entries(params).map(([k,v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+  const r = await fetch(`${V2}?chainid=${chain.chainId}&apikey=${esKey()}&${qs}`);
+  return r.json();
+}
+
+async function getBlockAtTimestamp(chainKey, timestamp) {
+  const d = await esFetch(chainKey, { module: 'block', action: 'getblocknobytime', timestamp, closest: 'before' });
+  if (d.status === '1') return parseInt(d.result);
+  throw new Error(`${CHAINS[chainKey].label} block lookup failed: ${d.result || d.message}`);
+}
+
+async function getNativeBalance(chainKey, address, block) {
+  const d = await esFetch(chainKey, { module: 'account', action: 'balance', address, tag: block });
+  return d.status === '1' ? BigInt(d.result) : BigInt(0);
+}
+
+// Reconstruct ERC-20 balances from transfer history (free tier compatible)
+async function getTokenBalancesAtBlock(chainKey, address, snapshotBlock) {
+  const addrLower = address.toLowerCase();
+  const d = await esFetch(chainKey, { module: 'account', action: 'tokentx', address, startblock: 0, endblock: snapshotBlock, sort: 'asc' });
+  if (d.status !== '1') return [];
+
+  const balances = new Map();
+  for (const tx of d.result) {
+    const contract = tx.contractAddress.toLowerCase();
+    if (!balances.has(contract)) {
+      balances.set(contract, { contract: tx.contractAddress, symbol: tx.tokenSymbol, decimals: parseInt(tx.tokenDecimal), balance: BigInt(0) });
+    }
+    const entry = balances.get(contract);
+    const amount = BigInt(tx.value);
+    if (tx.to.toLowerCase()   === addrLower) entry.balance += amount;
+    if (tx.from.toLowerCase() === addrLower) entry.balance -= amount;
+  }
+  return [...balances.values()].filter(t => t.balance > BigInt(0));
+}
+
+function formatAmount(val, decimals) {
+  if (val === BigInt(0)) return '0';
+  const div = BigInt(10 ** decimals);
+  const whole = val / div;
+  const frac = (val % div).toString().padStart(decimals, '0').replace(/0+$/, '');
+  return frac ? `${whole}.${frac.slice(0, 6)}` : `${whole}`;
+}
+
+function parseAmount(formatted) {
+  return parseFloat(formatted);
+}
+
+// ── CoinGecko price fetching ──────────────────────────────────────────────────
+
+// Cache to avoid re-fetching the same token in the same session
+const priceCache = new Map();
+
+// Rate limiter: CoinGecko free = 30 calls/min. We add a small delay between calls.
+let lastCgCall = 0;
+async function cgFetch(url) {
+  const now = Date.now();
+  const gap = now - lastCgCall;
+  if (gap < 2200) await sleep(2200 - gap); // ~27 calls/min to stay safe
+  lastCgCall = Date.now();
+  const headers = {};
+  const key = cgKey();
+  if (key) headers['x-cg-demo-api-key'] = key;
+  const r = await fetch(url, { headers });
+  if (r.status === 429) {
+    // Rate limited — wait 10s and retry once
+    await sleep(10000);
+    const r2 = await fetch(url, { headers });
+    return r2.json();
+  }
+  return r.json();
+}
+
+// Fetch historical price for a native coin (by CoinGecko coin ID)
+// Uses a 2-hour window around the snapshot timestamp to get hourly data
+async function getNativeCoinPrice(cgCoinId, timestamp) {
+  const cacheKey = `native:${cgCoinId}:${timestamp}`;
+  if (priceCache.has(cacheKey)) return priceCache.get(cacheKey);
+
+  const from = timestamp - 3600;
+  const to   = timestamp + 3600;
+  const url = `${CG}/coins/${cgCoinId}/market_chart/range?vs_currency=usd&from=${from}&to=${to}`;
+  const d = await cgFetch(url);
+
+  if (!d.prices || d.prices.length === 0) {
+    priceCache.set(cacheKey, null);
+    return null;
+  }
+  // Find the price point closest to our timestamp
+  const price = closestPrice(d.prices, timestamp * 1000);
+  priceCache.set(cacheKey, price);
+  return price;
+}
+
+// Fetch historical price for an ERC-20 token by contract address
+async function getTokenPrice(cgPlatform, contractAddress, timestamp) {
+  const cacheKey = `token:${cgPlatform}:${contractAddress.toLowerCase()}:${timestamp}`;
+  if (priceCache.has(cacheKey)) return priceCache.get(cacheKey);
+
+  const from = timestamp - 3600;
+  const to   = timestamp + 3600;
+  const url = `${CG}/coins/${cgPlatform}/contract/${contractAddress}/market_chart/range?vs_currency=usd&from=${from}&to=${to}`;
+  const d = await cgFetch(url);
+
+  if (!d.prices || d.prices.length === 0) {
+    priceCache.set(cacheKey, null);
+    return null;
+  }
+  const price = closestPrice(d.prices, timestamp * 1000);
+  priceCache.set(cacheKey, price);
+  return price;
+}
+
+// From an array of [timestamp_ms, price] pairs, return the price closest to targetMs
+function closestPrice(prices, targetMs) {
+  let best = prices[0];
+  let bestDiff = Math.abs(prices[0][0] - targetMs);
+  for (const p of prices) {
+    const diff = Math.abs(p[0] - targetMs);
+    if (diff < bestDiff) { best = p; bestDiff = diff; }
+  }
+  return best[1];
+}
+
+function fmtUSD(val) {
+  if (val === null || val === undefined) return null;
+  if (val >= 1000000) return '$' + (val / 1000000).toFixed(2) + 'M';
+  if (val >= 1000)    return '$' + val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return '$' + val.toFixed(2);
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Detect file:// protocol and show banner
+if (window.location.protocol === 'file:') {
+  document.getElementById('corsBanner').style.display = 'block';
+}
+
+// ── Main fetch ────────────────────────────────────────────────────────────────
+
+async function fetchAll() {
+  if (!esKey()) { setStatus('Please enter your Etherscan API key.', true); return; }
+  const dateVal = document.getElementById('snapDate').value;
+  if (!dateVal) { setStatus('Please select a date.', true); return; }
+
+  const [y, m, d] = dateVal.split('-').map(Number);
+  const [hh, mm] = document.getElementById('snapTime').value.split(':').map(Number);
+  const snapshotDate = new Date(Date.UTC(y, m - 1, d, hh, mm, 0));
+  const timestamp = Math.floor(snapshotDate.getTime() / 1000);
+
+  const usePrices = !!cgKey();
+
+  const btn = document.getElementById('fetchBtn');
+  btn.disabled = true;
+  document.getElementById('results').classList.remove('visible');
+  allResults = [];
+  priceCache.clear();
+  document.getElementById('resultsInner').innerHTML = '';
+
+  try {
+    for (let wi = 0; wi < wallets.length; wi++) {
+      const addr = wallets[wi].address.trim();
+      if (!addr || !addr.startsWith('0x')) continue;
+
+      const walletDiv = document.createElement('div');
+      walletDiv.className = 'wallet-block';
+      walletDiv.innerHTML = `
+        <div class="wallet-header">
+          <span class="wallet-label">Wallet ${wi + 1}</span>
+          <span class="wallet-addr">${addr}</span>
+        </div>`;
+      document.getElementById('resultsInner').appendChild(walletDiv);
+      document.getElementById('results').classList.add('visible');
+
+      for (const chainKey of wallets[wi].chains) {
+        const chain = CHAINS[chainKey];
+        setStatus(`[${chain.label}] Looking up block at ${snapshotDate.toUTCString()}...`);
+
+        const chainDiv = document.createElement('div');
+        chainDiv.className = 'chain-block';
+        const colHeaders = usePrices
+          ? '<th>Token</th><th>Contract</th><th class="right">Balance</th><th class="right">Price</th><th class="right">USD Value</th>'
+          : '<th>Token</th><th>Contract</th><th class="right">Balance</th>';
+        chainDiv.innerHTML = `
+          <div class="chain-label chain-${chainKey}">${chain.label}</div>
+          <div class="snapshot-info" id="snap-${wi}-${chainKey}">Looking up block...</div>
+          <table>
+            <thead><tr>${colHeaders}</tr></thead>
+            <tbody id="tbody-${wi}-${chainKey}">
+              <tr><td colspan="${usePrices ? 5 : 3}" style="color:var(--muted);font-style:italic;padding:12px">Loading...</td></tr>
+            </tbody>
+          </table>
+          <div class="chain-total" id="total-${wi}-${chainKey}" style="display:none">
+            Chain total: <span id="totalval-${wi}-${chainKey}"></span>
+          </div>`;
+        walletDiv.appendChild(chainDiv);
+
+        try {
+          const block = await getBlockAtTimestamp(chainKey, timestamp);
+          document.getElementById(`snap-${wi}-${chainKey}`).textContent =
+            `Snapshot at block #${block.toLocaleString()} \u00b7 ${snapshotDate.toUTCString()}`;
+
+          const tbody = document.getElementById(`tbody-${wi}-${chainKey}`);
+          tbody.innerHTML = '';
+
+          let chainTotalUSD = 0;
+
+          // ── Native balance ──
+          setStatus(`[${chain.label}] Fetching ${chain.nativeSym} balance...`);
+          const nativeBal = await getNativeBalance(chainKey, addr, block);
+          const nativeFmt = formatAmount(nativeBal, chain.nativeDec);
+          const nativeAmt = parseAmount(nativeFmt);
+
+          let nativePrice = null;
+          let nativeUSD = null;
+          if (usePrices && nativeAmt > 0) {
+            setStatus(`[${chain.label}] Fetching ${chain.nativeSym} price...`);
+            nativePrice = await getNativeCoinPrice(chain.cgNativeId, timestamp);
+            if (nativePrice !== null) nativeUSD = nativeAmt * nativePrice;
+          }
+
+          // Always show native token regardless of $1 threshold
+          if (nativeAmt > 0) {
+            addRow(tbody, chain.nativeSym, 'Native', nativeFmt, nativePrice, nativeUSD, usePrices);
+            chainTotalUSD += nativeUSD || 0;
+            allResults.push({ wallet: addr, chain: chain.label, token: chain.nativeSym, contract: 'native', balance: nativeFmt, price: nativePrice, usdValue: nativeUSD, block });
+          }
+
+          // ── ERC-20 tokens ──
+          setStatus(`[${chain.label}] Reconstructing ERC-20 balances at block #${block.toLocaleString()}...`);
+          const tokens = await getTokenBalancesAtBlock(chainKey, addr, block);
+
+          for (let ti = 0; ti < tokens.length; ti++) {
+            const t = tokens[ti];
+            const fmt = formatAmount(t.balance, t.decimals);
+            const amt = parseAmount(fmt);
+
+            let price = null;
+            let usdVal = null;
+            if (usePrices && amt > 0) {
+              setStatus(`[${chain.label}] Fetching price for ${t.symbol} (${ti + 1}/${tokens.length})...`);
+              price = await getTokenPrice(chain.cgPlatform, t.contract, timestamp);
+              if (price !== null) usdVal = amt * price;
+            }
+
+            // Filter: skip tokens worth less than $1.00 (only when price is available)
+            if (usePrices && usdVal !== null && usdVal < 1.0) continue;
+
+            addRow(tbody, t.symbol, t.contract, fmt, price, usdVal, usePrices);
+            chainTotalUSD += usdVal || 0;
+            allResults.push({ wallet: addr, chain: chain.label, token: t.symbol, contract: t.contract, balance: fmt, price, usdValue: usdVal, block });
+          }
+
+          // Show chain total if we have prices
+          if (usePrices && chainTotalUSD > 0) {
+            const totalEl = document.getElementById(`total-${wi}-${chainKey}`);
+            totalEl.style.display = 'block';
+            document.getElementById(`totalval-${wi}-${chainKey}`).textContent = fmtUSD(chainTotalUSD);
+          }
+
+        } catch (err) {
+          document.getElementById(`tbody-${wi}-${chainKey}`).innerHTML =
+            `<tr><td colspan="${usePrices ? 5 : 3}" style="color:var(--danger);padding:12px">${err.message}</td></tr>`;
+        }
+
+        await sleep(300);
+      }
+
+      const sep = document.createElement('hr');
+      sep.className = 'separator';
+      document.getElementById('resultsInner').appendChild(sep);
+    }
+
+    setStatus('\u2713 Done.' + (!cgKey() ? ' (Add a CoinGecko key to enable USD prices)' : ''));
+  } catch (err) {
+    const isCors = err.message === 'Failed to fetch';
+    const errMsg = isCors
+      ? 'Failed to fetch — CORS error. Serve the file via http://localhost:8080 (see banner above)'
+      : 'Error: ' + err.message;
+    setStatus(errMsg, true);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function addRow(tbody, symbol, contract, amount, price, usdVal, showPrice) {
+  const tr = document.createElement('tr');
+  const shortContract = contract === 'Native' ? '\u2014' : contract.slice(0,6) + '\u2026' + contract.slice(-4);
+
+  let priceCols = '';
+  if (showPrice) {
+    const priceStr = price !== null ? '$' + price.toFixed(price < 0.01 ? 8 : price < 1 ? 4 : 2) : '—';
+    const usdStr   = usdVal !== null ? fmtUSD(usdVal) : '—';
+    const usdClass = usdVal !== null ? 'usd-val' : 'no-price';
+    priceCols = `<td class="right">${priceStr}</td><td class="${usdClass}">${usdStr}</td>`;
+  }
+
+  tr.innerHTML = `
+    <td>${symbol}</td>
+    <td class="mono" title="${contract}">${shortContract}</td>
+    <td class="right">${amount}</td>
+    ${priceCols}`;
+  tbody.appendChild(tr);
+}
+
+function exportCSV() {
+  if (!allResults.length) return;
+  const headers = ['Wallet','Chain','Token','Contract','Balance','Price USD','Value USD','Block'];
+  const rows = allResults.map(r => [
+    r.wallet, r.chain, r.token, r.contract, r.balance,
+    r.price !== null && r.price !== undefined ? r.price.toFixed(8) : '',
+    r.usdValue !== null && r.usdValue !== undefined ? r.usdValue.toFixed(2) : '',
+    r.block
+  ]);
+  const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = `wallet-snapshot-${document.getElementById('snapDate').value}.csv`;
+  a.click();
+}
+</script>
+</body>
+</html>
